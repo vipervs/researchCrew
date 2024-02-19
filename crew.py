@@ -75,7 +75,7 @@ search = Task(
 )
 
 scrape_text = Task(
-    description="Scrape the text from the first and second provided links.",
+    description="Scrape the text from all provided links.",
     agent=researcher,
     async_execution=False,
     context=[search],
@@ -91,7 +91,7 @@ read_text = Task(
 # Forming the crew with a hierarchical process including the manager
 crew = Crew(
     agents=[researcher,reader],
-    tasks=[generate_keywords,search,scrape_text,read_text],
+    tasks=[generate_keywords,search,scrape_text],
     #manager_llm=azure, # The manager's LLM that will be used internally
 	#process=Process.hierarchical,  # Designating the hierarchical approach
     process=Process.sequential,

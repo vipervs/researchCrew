@@ -1,10 +1,15 @@
 import requests
 import os
+import time
 from dotenv import load_dotenv
 from langchain.tools import tool 
 from bs4 import BeautifulSoup
 from crewai import Agent, Task
 from langchain_openai import ChatOpenAI
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
 
 load_dotenv()
 
@@ -55,37 +60,54 @@ class CustomSearchTools:
         Useful to scrape and summarize a website content. Just pass a string with
         only the full URL, no need for a final slash `/`, e.g., https://google.com or https://clearbit.com/about-us
         """
-        response = requests.get(website)
-        if response.status_code != 200:
-            return "Failed to retrieve website content"
-
-        soup = BeautifulSoup(response.text, "html.parser")
-        content = "\n\n".join([p.text for p in soup.find_all('p')])
-        content = [content[i:i + 8000] for i in range(0, len(content), 8000)]
         summaries = []
-        for chunk in content:
-            agent = Agent(
-                role="Principal Researcher",
-                goal="Do amazing researches and summaries based on the content you are working with",
-                backstory="You're a Principal Researcher at an University and you need to do a research about a given topic.",
-                llm=gpt35,
-                #function_calling_llm=gpt35,
-                allow_delegation=False)
-            task = Task(
-                agent=agent,
-                description=f"Analyze and make a LONG summary of the content bellow, make sure to include the ALL relevant information in the summary, return only the summary with the Link: {website} nothing else.\n\nCONTENT:\n----------\n{chunk}.",
-                )
-            summary = task.execute()
-            summaries.append(summary)
-        
-        final_summary = "\n\n".join(summaries)
-        return f'\nScrapped Content: {final_summary}\n'
-    
+        if 'sciencedirect.com' in website:
+            # Setup webdriver
+            webdriver_service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=webdriver_service)
+            
+            driver.get(website)
+            
+            # Wait for the page to load
+            time.sleep(5)
+            
+            # Get title and abstract
+            title = driver.find_element(By.TAG_NAME, 'h1').text
+            abstract = driver.find_element(By.CLASS_NAME, 'abstract').text
+            conclusion = driver.find_element(By.XPATH, '//h2[text()="Conclusion"]/following-sibling::p[1]').text
 
-website = "https://www.sciencedirect.com/science/article/pii/S2444569X2300029X" 
+            return f'Title: {title}\n\nLink: {website}\n\nAbstract: {abstract}\n\nConclusion: {conclusion}'
+        elif 'frontiersin.org' in website:
+            response = requests.get(website)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                journal_abstract_section = soup.find('div', class_='JournalAbstract')
+                if journal_abstract_section:
+                    title_section = journal_abstract_section.find('h1')
+                    title_text = title_section.get_text(strip=True) if title_section else 'Title not found'
+                    abstract_section = journal_abstract_section.find('p')
+                    abstract_text = abstract_section.get_text(strip=True) if abstract_section else 'Abstract not found'
+                    return f'Title: {title_text}\n\nLink: {website}\n\nAbstract: {abstract_text}'
+                else:
+                    return 'Failed to find the JournalAbstract section'
+            else:
+                return 'Failed to retrieve the page'
+        elif 'pubmed.ncbi.nlm.nih.gov' in website:
+            response = requests.get(website)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                title_section = soup.find('h1', class_='heading-title')
+                title_text = title_section.get_text(strip=True) if title_section else 'Title not found'
+                abstract_section = soup.find('div', class_='abstract-content selected')
+                abstract_text = abstract_section.get_text(strip=True) if abstract_section else 'Abstract not found'
+                return f'Title: {title_text}\n\nLink: {website}\n\nAbstract: {abstract_text}'
+            else:
+                return 'Failed to retrieve the page'
+
+website ="https://www.frontiersin.org/articles/10.3389/frai.2021.553987"
 result = CustomSearchTools.scrape_and_summarize_website(website)
 print(result)
-    
+
 #query = '("Artificial Intelligence" OR "AI" OR "Machine Learning" OR "ML" OR "Deep Learning" OR "Natural Language Processing" OR "NLP") AND ("Global Health" OR "Public Health" OR "Healthcare Challenges" OR "Health Challenges" OR "Epidemiology" OR "Disease Surveillance" OR "Health Data Analysis") AND ("Challenges" OR "Solutions" OR "Applications" OR "Impact" OR "Innovation")'
 #search_results = CustomSearchTools.google_custom_search(query)
 #print(search_results)
