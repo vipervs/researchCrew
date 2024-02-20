@@ -4,15 +4,9 @@ from langchain.agents import load_tools
 from langchain_openai import AzureChatOpenAI
 from tools import CustomSearchTools
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
-
-lmstudio = ChatOpenAI(
-    base_url="http://localhost:1234/v1",
-    temperature=0.7,
-)
 
 gpt35 = ChatOpenAI(
     model_name="gpt-3.5-turbo", temperature="0"
@@ -25,14 +19,8 @@ azure = AzureChatOpenAI(
     base_url=os.getenv("AZURE_BASE"),
 )
 
-gemini = ChatGoogleGenerativeAI(model="gemini-pro",
-    verbose=True,
-    temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
-)
-
 # Define the topic of interest
-topic = 'AI in Global Health Challenges'
+topic = input("Please enter the research topic: ")
 
 # Loading Human Toolsa
 human_tools = load_tools(["human"])
@@ -45,17 +33,27 @@ researcher = Agent(
     backstory="""Your expertise lies in uncovering valuable insights within scientific databases and journals.
     With a sharp analytical mind, you adeptly navigate through complex information landscapes to find the most pertinent literature.""",
     llm=azure,
-    tools=[CustomSearchTools.google_custom_search, CustomSearchTools().scrape_and_summarize_website],
-    max_iter=20,
+    tools=[CustomSearchTools.google_custom_search],
+    max_iter=10,
 )
 
-reader = Agent(
-    role="Expert Reader",
-    goal=f"Evaluate the found literature for relevance and alignment with the Resarch Topic: {topic}, if not you can request more literature.",
+scraper = Agent(
+    role='Scraper',
+    goal=f'Use only the provided links and scrape the text with your tool',
     verbose=True,
-    allow_delegation=True,
-    backstory="""You have an exceptional critical eye, enabling you to meticulously review and assess the literature. 
-    Your role is pivotal in ensuring that only the most relevant and impactful sources are selected for further analysis and content creation.""",
+    allow_delegation=False,
+    backstory="""Expert in extracting links from content and scraping the text from the web""",
+    llm=gpt35,
+    tools=[CustomSearchTools().scrape_and_summarize_website],
+)
+
+writer = Agent(
+    role='Expert Writer',
+    goal=f'You will be provided abstracts and links around the topic: {topic}, make sure you only use the provided text and blend it coherent into a scientific article.',
+    verbose=True,
+    allow_delegation=False,
+    backstory="""With a talent for blending scholarly research with exceptional writing skills, you are adept at producing detailed drafts that incorporate critical findings.
+    Your capacity to integrate cited literature into coherent narratives showcases your proficiency in generating well-supported academic texts.""",
     llm=azure,
 )
 
@@ -76,21 +74,19 @@ search = Task(
 
 scrape_text = Task(
     description="Scrape the text from all provided links.",
-    agent=researcher,
+    agent=scraper,
     async_execution=False,
     context=[search],
 )
 
-read_text = Task(
-    description=f"Read the summaries and decide if they line up with the Research Topic: {topic}, if not ask for more sources from the Researcher",
-    agent=reader,
-    async_execution=False,
+write_article = Task(
+    description=f"Write a detailed scientific article around {topic}, integrating all insights from the literature search provided to you, make sure to cite the links in numbers style and maintain a bibliography referencing them.",
+    agent=writer,
     context=[scrape_text],
 )
 
-# Forming the crew with a hierarchical process including the manager
 crew = Crew(
-    agents=[researcher,reader],
+    agents=[researcher,scraper,writer],
     tasks=[generate_keywords,search,scrape_text],
     #manager_llm=azure, # The manager's LLM that will be used internally
 	#process=Process.hierarchical,  # Designating the hierarchical approach
@@ -100,7 +96,5 @@ crew = Crew(
 
 # Kick off the crew's work
 results = crew.kickoff()
-
-# Print the results
-print("Crew Work Results:")
+print("---------Crew Work Results---------")
 print(results)

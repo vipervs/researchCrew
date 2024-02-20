@@ -104,9 +104,9 @@ class CustomSearchTools:
             else:
                 return 'Failed to retrieve the page'
 
-website ="https://www.frontiersin.org/articles/10.3389/frai.2021.553987"
-result = CustomSearchTools.scrape_and_summarize_website(website)
-print(result)
+#website ="https://www.frontiersin.org/articles/10.3389/frai.2021.553987"
+#result = CustomSearchTools.scrape_and_summarize_website(website)
+#print(result)
 
 #query = '("Artificial Intelligence" OR "AI" OR "Machine Learning" OR "ML" OR "Deep Learning" OR "Natural Language Processing" OR "NLP") AND ("Global Health" OR "Public Health" OR "Healthcare Challenges" OR "Health Challenges" OR "Epidemiology" OR "Disease Surveillance" OR "Health Data Analysis") AND ("Challenges" OR "Solutions" OR "Applications" OR "Impact" OR "Innovation")'
 #search_results = CustomSearchTools.google_custom_search(query)
