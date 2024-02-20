@@ -1,15 +1,16 @@
 import requests
 import os
 import time
+import datetime
 from dotenv import load_dotenv
 from langchain.tools import tool 
 from bs4 import BeautifulSoup
-from crewai import Agent, Task
 from langchain_openai import ChatOpenAI
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
 
 load_dotenv()
 
@@ -23,7 +24,7 @@ lmstudio = ChatOpenAI(
 
 class CustomSearchTools:
 
-    @tool("Perform literature search")
+    @tool("google_custom_search")
     def google_custom_search(query):
         """
         Performs a literature search using Google Custom Search Engine (CSE).
@@ -53,14 +54,15 @@ class CustomSearchTools:
         results = results[:10]
     
         return results
-    
-    @tool("Scrape website content")
+
+    @tool("scrape_and_summarize_website")
     def scrape_and_summarize_website(website):
         """
         Useful to scrape and summarize a website content. Just pass a string with
         only the full URL, no need for a final slash `/`, e.g., https://google.com or https://clearbit.com/about-us
         """
         summaries = []
+        result = ''
         if 'sciencedirect.com' in website:
             # Setup webdriver
             webdriver_service = Service(ChromeDriverManager().install())
@@ -72,11 +74,24 @@ class CustomSearchTools:
             time.sleep(5)
             
             # Get title and abstract
-            title = driver.find_element(By.TAG_NAME, 'h1').text
-            abstract = driver.find_element(By.CLASS_NAME, 'abstract').text
-            conclusion = driver.find_element(By.XPATH, '//h2[text()="Conclusion"]/following-sibling::p[1]').text
-
-            return f'Title: {title}\n\nLink: {website}\n\nAbstract: {abstract}\n\nConclusion: {conclusion}'
+            try:
+                abstract1 = driver.find_element(By.CLASS_NAME, 'abstract').text
+            except NoSuchElementException:
+                abstract1 = "No Abstract 1 found"
+            try:
+                abstract2 = driver.find_element(By.ID, 'abspara0010').text
+            except NoSuchElementException:
+                abstract2 = "No Abstract 2 found"
+            try:
+                title = driver.find_element(By.TAG_NAME, 'h1').text
+            except NoSuchElementException:
+                title = "No Title found"
+            try:
+                conclusion = driver.find_element(By.XPATH, '//h2[text()="Conclusion"]/following-sibling::p[1]').text
+            except NoSuchElementException:
+                conclusion = "No Conclusion section found"
+            
+            result = f'Title: {title}\n\nLink: {website}\n\nAbstract1: {abstract1}\n\nAbstract2: {abstract2}\n\nConclusion: {conclusion}'
         elif 'frontiersin.org' in website:
             response = requests.get(website)
             if response.status_code == 200:
@@ -87,11 +102,11 @@ class CustomSearchTools:
                     title_text = title_section.get_text(strip=True) if title_section else 'Title not found'
                     abstract_section = journal_abstract_section.find('p')
                     abstract_text = abstract_section.get_text(strip=True) if abstract_section else 'Abstract not found'
-                    return f'Title: {title_text}\n\nLink: {website}\n\nAbstract: {abstract_text}'
+                    result = f'Title: {title_text}\n\nLink: {website}\n\nAbstract: {abstract_text}'
                 else:
-                    return 'Failed to find the JournalAbstract section'
+                    result = 'Failed to find the JournalAbstract section'
             else:
-                return 'Failed to retrieve the page'
+                result = 'Failed to retrieve the page'
         elif 'pubmed.ncbi.nlm.nih.gov' in website:
             response = requests.get(website)
             if response.status_code == 200:
@@ -100,11 +115,29 @@ class CustomSearchTools:
                 title_text = title_section.get_text(strip=True) if title_section else 'Title not found'
                 abstract_section = soup.find('div', class_='abstract-content selected')
                 abstract_text = abstract_section.get_text(strip=True) if abstract_section else 'Abstract not found'
-                return f'Title: {title_text}\n\nLink: {website}\n\nAbstract: {abstract_text}'
+                result = f'Title: {title_text}\n\nLink: {website}\n\nAbstract: {abstract_text}'
             else:
-                return 'Failed to retrieve the page'
+                result = 'Failed to retrieve the page'
 
-#website ="https://www.frontiersin.org/articles/10.3389/frai.2021.553987"
+        # Get the current date
+        date = datetime.datetime.now().strftime("%Y_%m_%d")
+
+        # Define the filename
+        filename = f"{date}.txt"
+
+        # Check if the file exists
+        if os.path.exists(filename):
+            append_write = 'a'  # Append if already exists
+        else:
+            append_write = 'w'  # Make a new file if not
+
+        # Write the result to the file
+        with open(filename, append_write) as f:
+            f.write(result + '\n')
+
+        return result
+
+#website ="https://www.sciencedirect.com/science/article/pii/S1532046420301283"
 #result = CustomSearchTools.scrape_and_summarize_website(website)
 #print(result)
 

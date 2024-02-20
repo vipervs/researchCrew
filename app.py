@@ -1,10 +1,12 @@
 import os
+import datetime
 from crewai import Agent, Task, Crew, Process
 from langchain.agents import load_tools
 from langchain_openai import AzureChatOpenAI
 from tools import CustomSearchTools
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from langchain.tools import tool 
 
 load_dotenv()
 
@@ -18,6 +20,26 @@ azure = AzureChatOpenAI(
     api_key=os.getenv("AZURE_API_KEY"),
     base_url=os.getenv("AZURE_BASE"),
 )
+
+@tool("read_file")
+def read_file():
+    """
+    Reads the scientific search results file and returns its content, no need for an tool input.
+    """
+    # Get the current date
+    date = datetime.datetime.now().strftime("%Y_%m_%d")
+
+    # Define the filename
+    filename = f"{date}.txt"
+
+    # Check if the file exists
+    if os.path.exists(filename):
+        # Read the file
+        with open(filename, 'r') as f:
+            content = f.read()
+        return content
+    else:
+        return f"No file named {filename} found."
 
 # Define the topic of interest
 topic = input("Please enter the research topic: ")
@@ -39,20 +61,19 @@ researcher = Agent(
 
 scraper = Agent(
     role='Scraper',
-    goal=f'Use only the provided links and scrape the text with your tool',
+    goal=f'Use the provided links and scrape the text from them',
     verbose=True,
     allow_delegation=False,
     backstory="""Expert in extracting links from content and scraping the text from the web""",
-    llm=gpt35,
-    tools=[CustomSearchTools().scrape_and_summarize_website],
+    llm=azure,
 )
 
 writer = Agent(
     role='Expert Writer',
-    goal=f'You will be provided abstracts and links around the topic: {topic}, make sure you only use the provided text and blend it coherent into a scientific article.',
+    goal=f'Use the provided text and blend it coherent into a scientific article, use a academic concise writing style.',
     verbose=True,
     allow_delegation=False,
-    backstory="""With a talent for blending scholarly research with exceptional writing skills, you are adept at producing detailed drafts that incorporate critical findings.
+    backstory="""With a concise scientific writing style, you are adept at producing detailed drafts that incorporate critical findings.
     Your capacity to integrate cited literature into coherent narratives showcases your proficiency in generating well-supported academic texts.""",
     llm=azure,
 )
@@ -73,21 +94,24 @@ search = Task(
 )
 
 scrape_text = Task(
-    description="Scrape the text from all provided links.",
+    description="Use all provided links one by one and scrape the text with scrape_and_summarize_website tool.",
     agent=scraper,
     async_execution=False,
-    context=[search],
+    tools=[CustomSearchTools().scrape_and_summarize_website],
 )
 
 write_article = Task(
-    description=f"Write a detailed scientific article around {topic}, integrating all insights from the literature search provided to you, make sure to cite the links in numbers style and maintain a bibliography referencing them.",
+    description=f"Use your tool to retrieve the content of the search results and write a detailed scientific article around {topic}, integrating all insights only from the search results, make sure to cite (the links) in numbers style and maintain a bibliography.",
+    expected_output="Detailed article with a bibliography section, formated in markdown",
     agent=writer,
-    context=[scrape_text],
+    tools=[read_file]
 )
 
 crew = Crew(
+    #agents=[writer],
+    #tasks=[write_article],
     agents=[researcher,scraper,writer],
-    tasks=[generate_keywords,search,scrape_text],
+    tasks=[generate_keywords,search,scrape_text,write_article],
     #manager_llm=azure, # The manager's LLM that will be used internally
 	#process=Process.hierarchical,  # Designating the hierarchical approach
     process=Process.sequential,
