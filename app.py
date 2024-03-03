@@ -6,9 +6,13 @@ from langchain_openai import AzureChatOpenAI
 from tools import CustomSearchTools
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.tools import tool 
+from langchain.tools import tool
+from langchain_community.llms import Ollama
+
 
 load_dotenv()
+
+ollama = Ollama(model="solar")
 
 gpt35 = ChatOpenAI(
     model_name="gpt-3.5-turbo", temperature="0"
@@ -101,7 +105,7 @@ scrape_text = Task(
 )
 
 write_article = Task(
-    description=f"Use your tool to retrieve the content of the search results and write a detailed scientific article around {topic}, integrating all insights only from the search results, make sure to cite (the links) in numbers style and maintain a bibliography.",
+    description=f"Use read_file tool to retrieve the content of the search results and write a detailed scientific article around {topic}, integrating all insights only from the search results, make sure to cite (the links) in numbers style and maintain a bibliography.",
     expected_output="Detailed article with a bibliography section, formated in markdown",
     agent=writer,
     tools=[read_file]

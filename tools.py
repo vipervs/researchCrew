@@ -49,7 +49,7 @@ class CustomSearchTools:
         # Extract the search results
         items = json_data.get("items", [])
         # Extract and return only the 'title' and 'link' from the search results
-        results = [{"title": item["title"], "link": item["link"]} for item in items]
+        results = [{"title": item["title"], "link": item["link"], "snippet": item.get("snippet")} for item in items]
         # Limit results to 10
         results = results[:10]
     
@@ -141,6 +141,6 @@ class CustomSearchTools:
 #result = CustomSearchTools.scrape_and_summarize_website(website)
 #print(result)
 
-#query = '("Artificial Intelligence" OR "AI" OR "Machine Learning" OR "ML" OR "Deep Learning" OR "Natural Language Processing" OR "NLP") AND ("Global Health" OR "Public Health" OR "Healthcare Challenges" OR "Health Challenges" OR "Epidemiology" OR "Disease Surveillance" OR "Health Data Analysis") AND ("Challenges" OR "Solutions" OR "Applications" OR "Impact" OR "Innovation")'
-#search_results = CustomSearchTools.google_custom_search(query)
-#print(search_results)
+query = '("Artificial Intelligence" OR "AI" OR "Machine Learning" OR "ML" OR "Deep Learning" OR "Natural Language Processing" OR "NLP") AND ("Global Health" OR "Public Health" OR "Healthcare Challenges" OR "Health Challenges" OR "Epidemiology" OR "Disease Surveillance" OR "Health Data Analysis") AND ("Challenges" OR "Solutions" OR "Applications" OR "Impact" OR "Innovation")'
+search_results = CustomSearchTools.google_custom_search(query)
+print(search_results)
